@@ -1,0 +1,100 @@
+---
+title: "launch site 筛选程序"
+output: html_notebook
+---
+
+## 1.配置分析环境
+```{r}
+if(!require(tidyverse)){
+  install.packages("tidyverse")
+}
+require(tidyverse)
+
+# 对单个被试的单个sentence依据规则提取launch site特征值位点
+extract_result <- function(input_table) {
+  result <- as.numeric(vector(length = ncol(input_table)))
+  if(nrow(input_table) == 1){
+    result <- input_table[1,]
+  }else{
+    mydata %>% 
+      filter(RECORDING_SESSION_LABEL == input_table$RECORDING_SESSION_LABEL[1] & sentence == input_table$sentence[1]) %>% 
+      filter(CURRENT_FIX_INTEREST_AREA_RUN_ID == 1) %>% 
+      filter(CURRENT_FIX_INTEREST_AREA_ID == 2 | CURRENT_FIX_INTEREST_AREA_ID == 3 | CURRENT_FIX_INTEREST_AREA_ID == 4) -> cheak_table
+    if(nrow(cheak_table) == 1){
+      result <- cheak_table[1,]
+    }else{
+      
+      if(length(unique(cheak_table$CURRENT_FIX_INTEREST_AREA_ID)) == 2){
+      position_two <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 2)
+      position_three <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID != 2)
+      
+      if(cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] > cheak_table$CURRENT_FIX_INDEX[position_three[1]]){
+        result <- input_table %>% 
+          filter(CURRENT_FIX_INTEREST_AREA_ID == 1)
+      }else{
+        result <- input_table %>% 
+          filter(CURRENT_FIX_INTEREST_AREA_ID == 2)
+      }}else{
+        position_two <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 2)
+        position_three <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 3)
+        position_four <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 4)
+        
+        ans_two_three <- cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] < cheak_table$CURRENT_FIX_INDEX[position_three[1]]
+        ans_two_four <- cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] < cheak_table$CURRENT_FIX_INDEX[position_four[1]]
+        
+        get_sum <- sum(ans_two_four, ans_two_three, na.rm = TRUE)
+        
+        if(get_sum == 2){
+          result <- input_table %>% 
+            filter(CURRENT_FIX_INTEREST_AREA_ID == 2)
+        }else{
+          result <- input_table %>% 
+            filter(CURRENT_FIX_INTEREST_AREA_ID == 1)
+        }
+      }
+    }
+  }
+  return(result)
+}
+
+convert_list_to_dataframe <- function(x){
+  a <- select(as.data.frame(x), RECORDING_SESSION_LABEL, sentence, word_complex, preview, condition, CURRENT_FIX_INDEX, CURRENT_FIX_INTEREST_AREA_ID, CURRENT_FIX_INTEREST_AREA_RUN_ID, CURRENT_FIX_X)
+  return(a)
+}
+```
+
+## 2. 数据的预处理
+```{r}
+mydata <- read.csv(file.choose(), header = TRUE, stringsAsFactors = FALSE)
+
+mydata <- mydata %>% 
+  filter(CURRENT_FIX_INTEREST_AREA_ID != ".")
+
+mydata$CURRENT_FIX_INTEREST_AREA_ID_2 <- c(mydata$CURRENT_FIX_INTEREST_AREA_ID[-1], 0)
+
+mydata %>% 
+  transform(CURRENT_FIX_INTEREST_AREA_ID = as.numeric(CURRENT_FIX_INTEREST_AREA_ID), CURRENT_FIX_INTEREST_AREA_ID_2 = as.numeric(CURRENT_FIX_INTEREST_AREA_ID_2)) %>% 
+  mutate(Cha = CURRENT_FIX_INTEREST_AREA_ID_2 - CURRENT_FIX_INTEREST_AREA_ID) %>% 
+  filter(Cha != 0) %>% 
+  filter(CURRENT_FIX_INTEREST_AREA_RUN_ID == 1) %>% 
+  filter(CURRENT_FIX_INTEREST_AREA_ID == 1 | CURRENT_FIX_INTEREST_AREA_ID == 2) %>% 
+  split(.$RECORDING_SESSION_LABEL) -> sub_list
+```
+
+## 3. 对数据进行分批处理
+```{r}
+result_list <- list()
+for(i in 1:length(sub_list)){
+  sub_list[[i]] %>% 
+    split(.$sentence) %>% 
+    map(extract_result) -> all_list
+  
+single_sub <- do.call(rbind, lapply(all_list, convert_list_to_dataframe))
+  
+result_list[[i]] <- single_sub
+}
+
+result <- do.call(rbind, lapply(result_list, convert_list_to_dataframe))
+
+write.csv(result, "result.csv")
+```

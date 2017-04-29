@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "---\ntitle: \"launch site 筛选程序\"\noutput: html_notebook\n---\n\n## 1.配置分析环境\n```{r}\nif(!require(tidyverse)){\n  install.packages(\"tidyverse\")\n}\nrequire(tidyverse)\n\n# 对单个被试的单个sentence依据规则提取launch site特征值位点\nextract_result <- function(input_table) {\n  result <- as.numeric(vector(length = ncol(input_table)))\n  if(nrow(input_table) == 1){\n    result <- input_table[1,]\n  }else{\n    mydata %>% \n      filter(RECORDING_SESSION_LABEL == input_table$RECORDING_SESSION_LABEL[1] & sentence == input_table$sentence[1]) %>% \n      filter(CURRENT_FIX_INTEREST_AREA_RUN_ID == 1) %>% \n      filter(CURRENT_FIX_INTEREST_AREA_ID == 2 | CURRENT_FIX_INTEREST_AREA_ID == 3 | CURRENT_FIX_INTEREST_AREA_ID == 4) -> cheak_table\n    if(nrow(cheak_table) == 1){\n      result <- cheak_table[1,]\n    }else{\n      \n      if(length(unique(cheak_table$CURRENT_FIX_INTEREST_AREA_ID)) == 2){\n      position_two <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 2)\n      position_three <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID != 2)\n      \n      if(cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] > cheak_table$CURRENT_FIX_INDEX[position_three[1]]){\n        result <- input_table %>% \n          filter(CURRENT_FIX_INTEREST_AREA_ID == 1)\n      }else{\n        result <- input_table %>% \n          filter(CURRENT_FIX_INTEREST_AREA_ID == 2)\n      }}else{\n        position_two <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 2)\n        position_three <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 3)\n        position_four <- which(cheak_table$CURRENT_FIX_INTEREST_AREA_ID == 4)\n        \n        ans_two_three <- cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] < cheak_table$CURRENT_FIX_INDEX[position_three[1]]\n        ans_two_four <- cheak_table$CURRENT_FIX_INDEX[position_two[length(position_two)]] < cheak_table$CURRENT_FIX_INDEX[position_four[1]]\n        \n        get_sum <- sum(ans_two_four, ans_two_three, na.rm = TRUE)\n        \n        if(get_sum == 2){\n          result <- input_table %>% \n            filter(CURRENT_FIX_INTEREST_AREA_ID == 2)\n        }else{\n          result <- input_table %>% \n            filter(CURRENT_FIX_INTEREST_AREA_ID == 1)\n        }\n      }\n    }\n  }\n  return(result)\n}\n\nconvert_list_to_dataframe <- function(x){\n  a <- select(as.data.frame(x), RECORDING_SESSION_LABEL, sentence, word_complex, preview, condition, CURRENT_FIX_INDEX, CURRENT_FIX_INTEREST_AREA_ID, CURRENT_FIX_INTEREST_AREA_RUN_ID, CURRENT_FIX_X)\n  return(a)\n}\n```\n\n## 2. 数据的预处理\n```{r}\nmydata <- read.csv(file.choose(), header = TRUE, stringsAsFactors = FALSE)\n\nmydata <- mydata %>% \n  filter(CURRENT_FIX_INTEREST_AREA_ID != \".\")\n\nmydata$CURRENT_FIX_INTEREST_AREA_ID_2 <- c(mydata$CURRENT_FIX_INTEREST_AREA_ID[-1], 0)\n\nmydata %>% \n  transform(CURRENT_FIX_INTEREST_AREA_ID = as.numeric(CURRENT_FIX_INTEREST_AREA_ID), CURRENT_FIX_INTEREST_AREA_ID_2 = as.numeric(CURRENT_FIX_INTEREST_AREA_ID_2)) %>% \n  mutate(Cha = CURRENT_FIX_INTEREST_AREA_ID_2 - CURRENT_FIX_INTEREST_AREA_ID) %>% \n  filter(Cha != 0) %>% \n  filter(CURRENT_FIX_INTEREST_AREA_RUN_ID == 1) %>% \n  filter(CURRENT_FIX_INTEREST_AREA_ID == 1 | CURRENT_FIX_INTEREST_AREA_ID == 2) %>% \n  split(.$RECORDING_SESSION_LABEL) -> sub_list\n```\n\n## 3. 对数据进行分批处理\n```{r}\nresult_list <- list()\nfor(i in 1:length(sub_list)){\n  sub_list[[i]] %>% \n    split(.$sentence) %>% \n    map(extract_result) -> all_list\n  \nsingle_sub <- do.call(rbind, lapply(all_list, convert_list_to_dataframe))\n  \nresult_list[[i]] <- single_sub\n}\n\nresult <- do.call(rbind, lapply(result_list, convert_list_to_dataframe))\n\nwrite.csv(result, \"result.csv\")\n```",
+    "created" : 1493452322861.000,
+    "dirty" : false,
+    "encoding" : "GB18030",
+    "folds" : "",
+    "hash" : "3129440896",
+    "id" : "1E29C428",
+    "lastKnownWriteTime" : 1493459615,
+    "last_content_update" : 1493459615684,
+    "path" : "~/Documents/Code/Duhong_Shaixuan/launchsite筛选程序.Rmd",
+    "project_path" : "launchsite筛选程序.Rmd",
+    "properties" : {
+        "chunk_output_type" : "inline"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
