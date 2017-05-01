@@ -3,6 +3,29 @@ title: "launch site 筛选程序"
 output: html_notebook
 ---
 
+程序作者：夏骁凯
+联系方式：
+  - 邮件：xia@xiaokai.me
+  - 网址：http://xiaokai.me
+  - 微信：dddd1007
+本程序仅限天津师范大学·眼动研究组使用
+
+## Prologu
+### 本程序作用
+本程序旨在自动计算出起跳位置（launch site）的像素值，仅限于**目标区域为第三个兴趣区**的情况下。
+
+### 程序使用注意
+程序运行中，需要导入的原始数据为eyelink 1000或1000 plus 直接导出的数据，并将其转换为CSV格式。表格中必须包含以下眼动指标：
+  - RECORDING_SESSION_LABEL
+  - sentence
+  - CURRENT_FIX_INTEREST_AREA_ID
+  - CURRENT_FIX_INTEREST_AREA_RUN_ID
+  - CURRENT_FIX_X
+
+本程序中为使得结果易读，因此需要在输入数据中标记好word_complex、preview、condition等值并标记好列名。
+
+具体表格格式可以看程序中附带的示例数据 launch_site_example.csv
+
 ## 1.配置分析环境
 ```{r}
 if(!require(tidyverse)){
@@ -11,6 +34,7 @@ if(!require(tidyverse)){
 require(tidyverse)
 
 # 对单个被试的单个sentence依据规则提取launch site特征值位点
+# 输入数据为每个被试的每个句子的data.frame
 extract_result <- function(input_table) {
   result <- as.numeric(vector(length = ncol(input_table)))
   if(nrow(input_table) == 1){
@@ -82,6 +106,7 @@ mydata %>%
 ```
 
 ## 3. 对数据进行分批处理
+根据目标位置为**第三兴趣区**的规则筛选结果。直接在程序运行目录下生成result.csv文件作为输出结果。
 ```{r}
 result_list <- list()
 for(i in 1:length(sub_list)){
@@ -98,3 +123,58 @@ result <- do.call(rbind, lapply(result_list, convert_list_to_dataframe))
 
 write.csv(result, "result.csv")
 ```
+
+## 4. 对特殊被试进行筛选
+一些被试他们的眼跳直接从兴趣区2调到了兴趣区5，并且对兴趣区3、4从未注视，因此我们之前的程序并没有将这些被试考虑在内，在此挑出。
+```{r}
+detect_outlier <- function(x) {
+  a <- x
+  if(sum(a == 2) > 0){
+    if(sum(is.element(a, c(3,4))) == 0){
+      result <- TRUE
+    }else{
+      result <- FALSE
+    }
+  }else{
+    result <- FALSE
+  }
+  return(result)
+}
+
+mydata %>% 
+  group_by(RECORDING_SESSION_LABEL, sentence) %>% 
+  summarise(outliner = detect_outlier(CURRENT_FIX_INTEREST_AREA_ID)) %>% 
+  filter(outliner == TRUE) -> outliner
+
+write.csv(x = outliner, "outliner.csv")
+```
+
+## 5. 本程序中最重要的一部分
+```{r}
+# 其实我想说最重要的是我的名字来着
+#
+#                       _oo0oo_
+#                      o8888888o
+#                      88" . "88
+#                      (| -_- |)
+#                      0\  =  /0
+#                    ___/`---'\___
+#                  .' \\|     |# '.
+#                 / \\|||  :  |||# \
+#                / _||||| -:- |||||- \
+#               |   | \\\  -  #/ |   |
+#               | \_|  ''\---/''  |_/ |
+#               \  .-\__  '-'  ___/-. /
+#             ___'. .'  /--.--\  `. .'___
+#          ."" '<  `.___\_<|>_/___.' >' "".
+#         | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+#         \  \ `_.   \_ __\ /__ _/   .-` /  /
+#     =====`-.____`.___ \_____/___.-`___.-'=====
+#                       `=---='
+#
+#
+#     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+#               佛祖保佑         永无BUG
+```
+

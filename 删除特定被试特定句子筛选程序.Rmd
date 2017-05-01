@@ -1,0 +1,99 @@
+---
+title: "删除特定被试特定句子筛选程序"
+output: html_notebook
+---
+
+程序作者：夏骁凯
+联系方式：
+  - 邮件：xia@xiaokai.me
+  - 网址：http://xiaokai.me
+  - 微信：dddd1007
+本程序仅限天津师范大学·眼动研究组使用
+
+## Prologu
+### 本程序作用
+本程序旨在对分析数据的csv表格中删除特定的被试和句子。
+
+### 程序使用注意
+程序运行中，需要导入两份数据。
+
+作为筛选标准的数据需要包含RECORDING_SESSION_LABEL、sentence两列数据。文件示例为：boundary_example.csv
+
+被筛选的原始数据为eyelink 1000或1000 plus 直接导出的数据，并将其转换为CSV格式。文件示例为：launch_site_example.csv。
+
+## 1. 配置分析环境
+```{r}
+if(!require(tidyverse)){
+  install.packages("tidyverse")
+}
+require(tidyverse)
+```
+
+## 2. 读取筛选规则
+请选择包含筛选规则的csv文件（文件示例：boundary_example.csv）
+```{r}
+boundary <- read.csv(file.choose(), header = T)
+```
+
+## 3. 筛选句子
+请选择需要被筛选的csv文件（文件示例：launch_site_example.csv）
+筛选后的结果自动生成筛选后的结果为csv文件：screened_data.csv
+```{r}
+#读取需要筛选的文件
+screen_data <- read.csv(file.choose(), header = TRUE, stringsAsFactors = FALSE)
+screen_data <- cbind(screen_data, index = 1 : nrow(screen_data))
+
+name_list <- unique(as.character(boundary$RECORDING_SESSION_LABEL))
+
+del_index <- 0
+
+for(i in name_list){
+  cheak_table <- screen_data %>% 
+    filter(RECORDING_SESSION_LABEL == i)
+  
+  a = 0
+  for(j in as.numeric(boundary[boundary$RECORDING_SESSION_LABEL == i,]$sentence)){
+    a <- c(a, cheak_table$index[cheak_table$sentence == j])
+  }
+  a <- a[-1]
+  
+  del_index <- c(del_index, a)
+}
+
+del_index <- del_index[del_index != 0]
+
+screen_data[-del_index, ] -> screened_data
+
+write.csv(screened_data, "screened_data.csv")
+```
+
+## 4. 本程序中最重要的一部分
+```{r}
+# 其实我真的想说最重要的是我的名字来着
+#
+#                       _oo0oo_
+#                      o8888888o
+#                      88" . "88
+#                      (| -_- |)
+#                      0\  =  /0
+#                    ___/`---'\___
+#                  .' \\|     |# '.
+#                 / \\|||  :  |||# \
+#                / _||||| -:- |||||- \
+#               |   | \\\  -  #/ |   |
+#               | \_|  ''\---/''  |_/ |
+#               \  .-\__  '-'  ___/-. /
+#             ___'. .'  /--.--\  `. .'___
+#          ."" '<  `.___\_<|>_/___.' >' "".
+#         | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+#         \  \ `_.   \_ __\ /__ _/   .-` /  /
+#     =====`-.____`.___ \_____/___.-`___.-'=====
+#                       `=---='
+#
+#
+#     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+#               佛祖保佑         永无BUG
+```
+
+
