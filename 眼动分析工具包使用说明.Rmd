@@ -20,13 +20,16 @@ classoption: "hyperref,"
 
 # 环境要求
 本程序需要在以下环境中使用：
+
 - R （版本号大于 3.3.0）
 - Rstudio （版本号大于 1.0.143）
 
 本程序运行前，请先确保安装以下程序包
+
 - tidyverse
 
 并确保以下包为最新版
+
 - rmarkdown
 - knitr
 
