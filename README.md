@@ -23,8 +23,8 @@
 
 ## 工具包内程序介绍
 
-### launch site 筛选程序
-本程序旨在自动计算出起跳位置（launch site）的像素值，仅限于**目标区域为第三个兴趣区**的情况下。
+### launch site 和 landing position 筛选程序
+本程序旨在自动计算出起跳位置（launch site）和落点位置（landing position）的像素值。
 
 ### 删除特定被试特定句子筛选程序
 本程序旨在对分析数据的csv表格中删除特定的被试和句子。
