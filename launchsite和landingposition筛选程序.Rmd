@@ -1,0 +1,190 @@
+---
+title: "如何用更正确的姿势筛选launch site和landing position"
+output: html_notebook
+---
+程序作者：夏骁凯
+联系方式：
+  - 邮件：xia@xiaokai.me
+  - 网址：http://xiaokai.me
+  - 微信：dddd1007
+本程序仅限天津师范大学·心理与行为研究院·眼动研究组使用
+
+## Prologu
+### 本程序作用
+本程序旨在自动计算出起跳位置（launch site）和落点位置（landing position）的像素值，目标AOI可为任意兴趣区。
+
+### 程序使用注意
+程序运行中，需要导入的原始数据为eyelink 1000或1000 plus 直接导出的数据，并将其转换为CSV格式。数据来源包括fixation与IA两个表格。表格中必须包含以下眼动指标：
+  - RECORDING_SESSION_LABEL
+  - sentence（句子编号）
+  - CURRENT_FIX_INTEREST_AREA_ID
+  - CURRENT_FIX_INTEREST_AREA_RUN_ID
+  - CURRENT_FIX_X
+请执行程序从上到下依次进行。
+
+在执行任意的任务，都必须保证前三个代码段运行完。随后可以根据自己的需求运行代码段4计算launch site或代码段5计算landing position
+
+1. 配置分析环境
+```{r}
+options(warn = -1)
+if(!require(tidyverse)){
+  install.packages("tidyverse")
+}
+
+if(!require(readr)){
+  install.packages("readxl")
+}
+
+# 提取边界信息的函数
+# 参数AOI指兴趣区编号
+get_principle_table <- function(IA, AOI = NA){
+  if(is.na(AOI)){print("请输入目标兴趣区AOI值！")}
+  IA %>% 
+    filter(IA_ID == AOI) %>% 
+    select(RECORDING_SESSION_LABEL, sentence, IA_LEFT, IA_ID) -> IA_result_middle
+  
+  IA_result_middle$sentence <- as.numeric(IA_result_middle$sentence)
+  IA_result_middle <- arrange(IA_result_middle, RECORDING_SESSION_LABEL, sentence)
+  
+  IA_result <- IA_result_middle %>% 
+    select(sentence, IA_LEFT)
+  IA_result <- IA_result[1:length(unique(IA_result$sentence)),]
+  
+  return(IA_result)
+}
+
+# 返回特定被试特定句子的launch site结果
+launch_site_result <- function(input_table) {
+  sentence <- unique(input_table$sentence)
+  principle_x <- principle_table$IA_LEFT[which(principle_table$sentence == sentence)]
+  
+  input_table <- dplyr::arrange(input_table, CURRENT_FIX_INDEX)
+  
+  launch_site_index <- input_table$CURRENT_FIX_INDEX[which(input_table$CURRENT_FIX_X > principle_x)[1] - 1]
+  
+  if(length(launch_site_index) != 0){
+    result <- data.frame(input_table[which(input_table$CURRENT_FIX_INDEX == launch_site_index), ])
+    result$LaunchSite <- principle_x - result$CURRENT_FIX_X
+  }else{
+    result <- data.frame(matrix("NA", nrow =1, ncol = (ncol(input_table) + 1)))
+    names(result) <- c(names(input_table), "LaunchSite")
+    result[1] <- input_table$RECORDING_SESSION_LABEL[1]
+    result[2] <- input_table$sentence[1]
+  }
+  
+  if(nrow(result) == 0){
+    result <- data.frame(matrix("NA", nrow =1, ncol = (ncol(input_table) + 1)))
+    names(result) <- c(names(input_table), "LaunchSite")
+    result[1] <- input_table$RECORDING_SESSION_LABEL[1]
+    result[2] <- input_table$sentence[1]
+  }
+  
+  return(result)
+}
+
+# 落点位置函数
+landing_position_result <- function(input_table) {
+  sentence <- unique(input_table$sentence)
+  principle_x <- principle_table$IA_LEFT[which(principle_table$sentence == sentence)]
+  
+  input_table <- dplyr::arrange(input_table, CURRENT_FIX_INDEX)
+  
+  launch_site_index <- input_table$CURRENT_FIX_INDEX[which(input_table$CURRENT_FIX_X > principle_x)[1]]
+  
+  if(length(launch_site_index) != 0){
+    result <- data.frame(input_table[which(input_table$CURRENT_FIX_INDEX == launch_site_index), ])
+  }else{
+    result <- data.frame(matrix("NA", nrow =1, ncol = ncol(input_table)))
+    names(result) <- names(input_table)
+    result[1] <- input_table$RECORDING_SESSION_LABEL[1]
+    result[2] <- input_table$sentence[1]
+  }
+  
+  if(nrow(result) == 0){
+    result <- data.frame(matrix("NA", nrow = 1, ncol = ncol(input_table)))
+    names(result) <- names(input_table)
+    result[1] <- input_table$RECORDING_SESSION_LABEL[1]
+    result[2] <- input_table$sentence[1]
+  }
+  
+  return(result)
+}
+```
+
+2. 读取数据
+先读取fixation文件，再读取IA文件
+```{r}
+# 读取fixation_report文件
+fixation <- readr::read_csv(file.choose())
+fixation <- fixation %>% 
+  select(RECORDING_SESSION_LABEL, sentence, CURRENT_FIX_INDEX, CURRENT_FIX_INTEREST_AREA_INDEX, CURRENT_FIX_INTEREST_AREA_RUN_ID, CURRENT_FIX_X)
+# 读取IA_report文件
+IA <- readr::read_csv(file.choose())
+```
+
+3. 提取左边界
+请在126行中的“AOI = ”部分输入要分析的兴趣区，如“AOI = 3”
+```{r}
+principle_table <- get_principle_table(IA, AOI = 3)
+```
+
+4. 提取每个被试的launch site
+提取每个被试的launch site，并生成文件launch_site.csv保存到当前目录
+```{r}
+fixation %>% 
+  split(list(.$RECORDING_SESSION_LABEL,.$sentence)) %>% 
+  map(launch_site_result) -> result_list
+
+do.call(rbind, result_list) -> launch_site
+
+launch_site <- launch_site %>% 
+  transform(sentence = as.numeric(as.character(sentence))) %>% 
+  arrange(RECORDING_SESSION_LABEL, sentence)
+
+write.csv(launch_site, "launch_site.csv")
+```
+
+5. 提取每个被试的landing position
+提取每个被试的landing position，并生成文件landing_position.csv保存到当前目录
+```{r}
+fixation %>% 
+  split(list(.$RECORDING_SESSION_LABEL,.$sentence)) %>% 
+  map(landing_position_result) -> landing_result_list
+
+do.call(rbind, landing_result_list) -> landing_position
+
+landing_position <- landing_position %>% 
+  transform(sentence = as.numeric(as.character(sentence))) %>% 
+  arrange(RECORDING_SESSION_LABEL, sentence)
+
+write.csv(landing_position, "landing_position.csv")
+```
+
+## 6. 本程序中最重要的一部分
+```{r}
+# 其实我想说最重要的是我的名字来着
+#
+#                       _oo0oo_
+#                      o8888888o
+#                      88" . "88
+#                      (| -_- |)
+#                      0\  =  /0
+#                    ___/`---'\___
+#                  .' \\|     |# '.
+#                 / \\|||  :  |||# \
+#                / _||||| -:- |||||- \
+#               |   | \\\  -  #/ |   |
+#               | \_|  ''\---/''  |_/ |
+#               \  .-\__  '-'  ___/-. /
+#             ___'. .'  /--.--\  `. .'___
+#          ."" '<  `.___\_<|>_/___.' >' "".
+#         | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+#         \  \ `_.   \_ __\ /__ _/   .-` /  /
+#     =====`-.____`.___ \_____/___.-`___.-'=====
+#                       `=---='
+#
+#
+#     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+#               佛祖保佑         永无BUG
+```
